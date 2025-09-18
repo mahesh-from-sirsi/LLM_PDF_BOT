@@ -1,19 +1,21 @@
-import streamlit as st
-from PyPDF2 import PdfReader
-from langchain_openai import ChatOpenAI
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
-from langchain.prompts import PromptTemplate
-import os
+# Importing necessary libraries
+import streamlit as st                                        # Library for Streamlit App
+from PyPDF2 import PdfReader                                  # Library for reading the PDF files
+from langchain_openai import ChatOpenAI                       # Library for creating the ChatAPI model
+from langchain.text_splitter import CharacterTextSplitter     # Library for creating the chunks of data read from a PDF file
+from langchain_community.vectorstores import FAISS            # Vector Store from FaceBook
+from langchain_openai import OpenAIEmbeddings                 # Library for creating the Embedding Models 
+from langchain.memory import ConversationBufferMemory         # Library for adding the memory to the LLM to retail last n contextx (query + response) 
+from langchain.chains import ConversationalRetrievalChain     # Library for simplifyling the user query to response (which otherwise needs query embedding, search vector store, split and parse etc)
+from langchain.prompts import PromptTemplate                  # Library for the Prompt template where same template can be used for different use cases
+import os                                                     # Library for OS Specific Operations (env variables/file paths etc)
+
 
 # Set OpenAI API key from secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
 # Page configuration
-st.set_page_config(page_title="Chat with PDF", page_icon="📚")
+st.set_page_config(page_title="Chat with PDF - AI Specific", page_icon="📚")
 st.title("Chat with your PDF 📚")
 
 # Initialize session state variables
@@ -24,6 +26,9 @@ if "chat_history" not in st.session_state:
 if "processComplete" not in st.session_state:
     st.session_state.processComplete = None
 
+# Method to extract the PDF file content and return the text
+# NOTE: THIS IS GOOD FOR TEXT ONLY and NOT FOR IMAGES/TABLES/CHARTS etc.
+# One Has to use the specialised PDF extractors
 def get_pdf_text(pdf_docs):
     text = ""
     for pdf in pdf_docs:
@@ -32,6 +37,7 @@ def get_pdf_text(pdf_docs):
             text += page.extract_text()
     return text
 
+# Method to chunk the text for embeddings for RAG use case
 def get_text_chunks(text):
     text_splitter = CharacterTextSplitter(
         separator="\n",
@@ -42,12 +48,14 @@ def get_text_chunks(text):
     chunks = text_splitter.split_text(text)
     return chunks
 
+# Get the conversation chain for getting the response to our queries from the LLM
 def get_conversation_chain(vectorstore):
     llm = ChatOpenAI(temperature=0.7, model_name='gpt-4o')
     
     template = """You are a helpful AI assistant that helps users understand their PDF documents.
     Use the following pieces of context to answer the question at the end.
-    If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    If you don't know the answer, or if the question is outside the scope of their PDF documents, 
+    just say that you don't know, don't try to make up an answer.
     
     {context}
     
@@ -107,6 +115,8 @@ with st.sidebar:
             success = process_docs(pdf_docs)
             if success:
                 st.success("Processing complete!")
+            else:
+                st.success("Failed to process the PDF document!")
 
 # Main chat interface
 if st.session_state.processComplete:
@@ -131,3 +141,4 @@ if st.session_state.processComplete:
 # Display initial instructions
 else:
     st.write("👈 Upload your PDFs in the sidebar to get started!")
+
